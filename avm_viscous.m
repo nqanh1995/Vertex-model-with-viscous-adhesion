@@ -50,7 +50,7 @@ function avm_viscous(nsteps, interval, seed, Npts, P0_value, KA_value, dt, tau_T
     data.parameters.L_thresh = L_thresh;
     data.parameters.v0_value = v0_value;
     data.parameters.Dr_value = Dr_value;
-    data.new_vm_info = struct('newV', [], 'newC', []);
+    data.new_vm_info = struct('V', [], 'C', []);
 
     strain = 0;
     
