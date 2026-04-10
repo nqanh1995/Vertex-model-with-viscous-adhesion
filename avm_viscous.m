@@ -88,7 +88,8 @@ function avm_viscous(nsteps, interval, seed, Npts, P0_value, KA_value, dt, tau_T
         end
         [V,~] = vm_minimize_LE(V,C,KP,P0,KA,A0,max_relaxation_steps,10^-9,0);
         
-
+    data.new_vm_info(output_step).V = V;
+    data.new_vm_info(output_step).C = C;
     for n = 1:nsteps
 
         V = position_mod_LE(V,box_size,mod(strain,1));
@@ -170,7 +171,7 @@ function avm_viscous(nsteps, interval, seed, Npts, P0_value, KA_value, dt, tau_T
         VF = VF + v0_list .* theta_v;
         [vvx,vvy] = get_vertex_velo_viscous(V,topo,VF,B,strain);
               
-
+        output_step = output_step + 1;
         %%%%%%%%%% save data
         
         
@@ -179,9 +180,9 @@ function avm_viscous(nsteps, interval, seed, Npts, P0_value, KA_value, dt, tau_T
         if mod(n, interval) == 0
             data.new_vm_info(output_step).V = V;
             data.new_vm_info(output_step).C = C;
-            
+            data.new_vm_info(output_step).VF = VF;           
         end
-    
+        
 
         V(:,1) = V(:,1) + vvx*dt;
         V(:,2) = V(:,2) + vvy*dt;
@@ -192,9 +193,7 @@ function avm_viscous(nsteps, interval, seed, Npts, P0_value, KA_value, dt, tau_T
         
     end
     elapsed_time = toc;
-    
-    data.all_tau_wait = all_tau_wait;
-    data.tau_wait = tau_wait;
+  
     
     data.Elapsed_time = elapsed_time;
     save(output_file_name, 'data', '-v7.3');
