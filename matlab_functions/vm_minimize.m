@@ -13,7 +13,7 @@ finc = 1.1;
 fdec = 0.5;
 f_alpha = 0.99;
 alpha_start = 0.1;
-dt_max = 100;
+dt_max = 1;
 dt_init = 0.01;
 fire_mass = 4; % inertia
 
