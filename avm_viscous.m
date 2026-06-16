@@ -171,7 +171,7 @@ function avm_viscous(nsteps, interval, seed, Npts, P0_value, KA_value, dt, tau_T
         VF = VF + v0_list .* theta_v;
         [vvx,vvy] = get_vertex_velo_viscous(V,topo,VF,B,strain);
               
-        output_step = output_step + 1;
+       
         %%%%%%%%%% save data
         
         
@@ -180,7 +180,8 @@ function avm_viscous(nsteps, interval, seed, Npts, P0_value, KA_value, dt, tau_T
         if mod(n, interval) == 0
             data.new_vm_info(output_step).V = V;
             data.new_vm_info(output_step).C = C;
-            data.new_vm_info(output_step).VF = VF;           
+            data.new_vm_info(output_step).VF = VF;    
+            output_step = output_step + 1;
         end
         
 
