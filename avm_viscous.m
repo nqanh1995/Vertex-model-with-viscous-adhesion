@@ -40,6 +40,7 @@ function avm_viscous(nsteps, interval, seed, Npts, P0_value, KA_value, dt, tau_T
     data = struct();
     data.parameters = struct();
     data.parameters.nsteps = nsteps;
+    data.parameters.B = B;
     data.parameters.interval = interval;
     data.parameters.seed = seed;
     data.parameters.Npts = Npts;
