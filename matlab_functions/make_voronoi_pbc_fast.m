@@ -1,90 +1,117 @@
 function [VertPos, CellList] = make_voronoi_pbc_fast(cx, cy)
-
+% MAKE_VORONOI_PBC_FAST  Build a periodic Voronoi tessellation from a set
+% of cell-center seed points, to use as the initial vertex-model geometry.
+%
+%   [VertPos, CellList] = MAKE_VORONOI_PBC_FAST(cx, cy) computes the
+%   Voronoi diagram of the seed points (cx, cy), assumed to live in the
+%   unit square [0,1) x [0,1) with periodic boundary conditions, by
+%   tiling periodic images of the points around the box before running
+%   MATLAB's Delaunay/Voronoi routines. Duplicate vertices introduced by
+%   the periodic wrapping are then merged.
+%
+% Inputs:
+%   cx, cy - npts x 1 vectors of seed point coordinates, normalized to
+%            the unit square [0,1)
+%
+% Outputs:
+%   VertPos  - Nvert x 2 array of Voronoi vertex positions, rescaled to
+%              a box of size sqrt(npts) x sqrt(npts)
+%   CellList - npts x 1 cell array; CellList{i} lists (in order around
+%              the polygon) the vertex indices belonging to cell i
+%
 % Author: Max Bi
 % e-mail address: bdpmax@gmail.com
 
-% Parameters for voronoi tesselation
-% Maximum number of neighbors a cell can have, chose 20 to be safe
-% maxzz = 20;
-% Parameters for voronoi tesselation
-% distance tolerance for distinguishing two vertices
-tol=1e-10;
+% Distance tolerance used to identify/merge duplicate vertices that arise
+% from periodic images sitting exactly on top of each other.
+tol = 1e-10;
 
 cx_original = cx;
 cy_original = cy;
 npts = length(cx);
-% 
+
+% --- Build periodic images: tile the 8 neighboring copies of the unit
+% cell around the original points, then keep only images that fall
+% within a margin (lmin) of the box, since farther copies can never
+% contribute a Voronoi vertex inside the box.
 cx_img = [[cx-1; cx; cx+1]; [cx-1;  cx+1]; [cx-1; cx; cx+1]];
 cy_img = [[cy-1; cy-1; cy-1]; [cy;  cy]; [cy+1; cy+1; cy+1]];
 lmin = 0.5;
-ind_include = cx_img > - lmin & cx_img < (1+lmin) & cy_img > - lmin & cy_img < (1+lmin);
+ind_include = cx_img > -lmin & cx_img < (1+lmin) & cy_img > -lmin & cy_img < (1+lmin);
 cx_img = cx_img(ind_include);
 cy_img = cy_img(ind_include);
 
+% --- Delaunay triangulation of the original points plus their nearby
+% periodic images, then take its dual Voronoi diagram.
+DT = delaunayTriangulation([[cx; cx_img], [cy; cy_img]]);
+[V, CellList] = voronoiDiagram(DT);
 
-
-DT = delaunayTriangulation([[cx;cx_img],[cy;cy_img]]);
-[V,CellList] = voronoiDiagram(DT);
-
+% Keep only the Voronoi cells belonging to the original (non-image)
+% points, wrap their vertices back into the unit box, and merge
+% duplicate vertices coming from different periodic images.
 CellList = CellList(1:npts);
 VertPos_ind = unique([CellList{:}]);
-VertPos = mod(V(VertPos_ind,:),1);
-[VertPos, ~, ind] = consolidator(VertPos,[],[],tol);
+VertPos = mod(V(VertPos_ind,:), 1);
+[VertPos, ~, ind] = consolidator(VertPos, [], [], tol);
 
-
+% --- Sanity check / retry loop: a valid 2D Voronoi tessellation of npts
+% cells under PBC should have exactly 2*npts vertices (Euler's formula
+% for a periodic trivalent network). If degenerate/overlapping vertices
+% collapsed to the wrong count, perturb the seed points slightly and
+% retry, up to tot_num_attempts times.
 tot_num_attempts = 1e3;
 num_attempts = 1;
-while size(VertPos,1) ~= npts*2 && num_attempts < tot_num_attempts
-    
-    cx = cx_original + randn(npts,1).*sqrt(tol);
-    cy = cy_original + randn(npts,1).*sqrt(tol);
+while size(VertPos, 1) ~= npts*2 && num_attempts < tot_num_attempts
+
+    cx = cx_original + randn(npts, 1) .* sqrt(tol);
+    cy = cy_original + randn(npts, 1) .* sqrt(tol);
 
     cx_img = [[cx-1; cx; cx+1]; [cx-1;  cx+1]; [cx-1; cx; cx+1]];
     cy_img = [[cy-1; cy-1; cy-1]; [cy;  cy]; [cy+1; cy+1; cy+1]];
     lmin = 1;
-    ind_include = cx_img > - lmin & cx_img < (1+lmin) & cy_img > - lmin & cy_img < (1+lmin);
+    ind_include = cx_img > -lmin & cx_img < (1+lmin) & cy_img > -lmin & cy_img < (1+lmin);
     cx_img = cx_img(ind_include);
     cy_img = cy_img(ind_include);
 
-
-
-
-    DT = delaunayTriangulation([[cx;cx_img],[cy;cy_img]]);
-    [V,CellList] = voronoiDiagram(DT);
+    DT = delaunayTriangulation([[cx; cx_img], [cy; cy_img]]);
+    [V, CellList] = voronoiDiagram(DT);
 
     CellList = CellList(1:npts);
     VertPos_ind = unique([CellList{:}]);
-    VertPos = mod(V(VertPos_ind,:),1);
-    [VertPos, ~, ind] = consolidator(VertPos,[],[],tol);
+    VertPos = mod(V(VertPos_ind,:), 1);
+    [VertPos, ~, ind] = consolidator(VertPos, [], [], tol);
     num_attempts = num_attempts + 1;
-    
-    if mod(num_attempts,10) == 0
-        disp('voronoi is overlapping, putting random kick')
-        disp(['stuck on single state doing voro, attempts so far =',num2str(num_attempts)]);
 
+    if mod(num_attempts, 10) == 0
+        disp('voronoi is overlapping, putting random kick')
+        disp(['stuck on single state doing voro, attempts so far =', num2str(num_attempts)]);
     end
 end
 
-if size(VertPos,1) ~= npts*2
-   disp('could not find a voro without overlaps!!! Giving up ....'); 
+if size(VertPos, 1) ~= npts*2
+    disp('could not find a voro without overlaps!!! Giving up ....');
 end
 
-
+% --- Re-index each cell's vertex list to point into the consolidated
+% (deduplicated) VertPos array.
 for i = 1:npts
-    [~,loc]=ismember(CellList{i},VertPos_ind);
+    [~, loc] = ismember(CellList{i}, VertPos_ind);
     CellList{i} = ind(loc)';
 end
 
-
-VertPos = VertPos*sqrt(npts);
-
-
-
-
+% Rescale from the unit box to the actual simulation box size
+% (sqrt(npts) x sqrt(npts), giving unit mean cell area).
+VertPos = VertPos * sqrt(npts);
 
 end
 
 
+% --------------------------------------------------------------------
+% Third-party helper bundled with this file (unmodified apart from
+% formatting): merges near-duplicate rows of x (within tolerance tol),
+% used above to merge Voronoi vertices that coincide across periodic
+% images. Original documentation preserved below.
+% --------------------------------------------------------------------
 function [xcon,ycon,ind] = consolidator(x,y,aggregation_mode,tol)
 % consolidator: consolidate "replicates" in x, also aggregate corresponding y
 % usage: [xcon,ycon,ind] = consolidator(x,y,aggregation_mode,tol)
